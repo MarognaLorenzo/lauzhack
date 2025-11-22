@@ -1,5 +1,7 @@
 package com.example.lauzhack
 
+import android.media.AudioAttributes
+import android.media.MediaPlayer
 import android.os.Bundle
 import android.util.Log // Import for logging
 import androidx.activity.ComponentActivity
@@ -21,11 +23,14 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp // Import for size units
 import androidx.compose.ui.unit.sp // Import for font size
 import com.example.lauzhack.ui.theme.LauzHackTheme
+import java.io.IOException
 
 // Define a TAG for the Logcat messages
 private const val TAG = "MainActivity"
 
 class MainActivity : ComponentActivity() {
+    private var mediaPlayer: MediaPlayer? = null
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -34,16 +39,61 @@ class MainActivity : ComponentActivity() {
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
                     // Change the content to use the new ScreenWithButton composable
                     ScreenWithButton(
-                        modifier = Modifier.padding(innerPadding)
+                        modifier = Modifier.padding(innerPadding),
+                        onPlayAudio = {
+                            val audioUrl = "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3"
+                            playAudioFromUrl(audioUrl)
+                        }
                     )
                 }
             }
         }
     }
+
+    private fun playAudioFromUrl(url: String) {
+        Log.d(TAG, "In the function playAudioFromUrl, url: $url")
+        mediaPlayer?.release()
+        mediaPlayer = MediaPlayer().apply {
+            try {
+                val audioAttributes = AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_MEDIA)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                    .build()
+                setAudioAttributes(audioAttributes)
+                setDataSource(url)
+                setOnPreparedListener {
+                    Log.d(TAG, "MediaPlayer prepared, starting playback")
+                    start()
+                }
+                setOnCompletionListener {
+                    Log.d(TAG, "MediaPlayer playback completed")
+                    it.release()
+                    mediaPlayer = null
+                }
+                setOnErrorListener { mp, what, extra ->
+                    Log.e(TAG, "MediaPlayer error: what: $what, extra: $extra")
+                    mp.release()
+                    mediaPlayer = null
+                    true
+                }
+                prepareAsync()
+            } catch (e: IOException) {
+                Log.e(TAG, "MediaPlayer IOException: ${e.message}")
+                release()
+                mediaPlayer = null
+            }
+        }
+    }
+
+    override fun onStop() {
+        super.onStop()
+        mediaPlayer?.release()
+        mediaPlayer = null
+    }
 }
 
 @Composable
-fun ScreenWithButton(modifier: Modifier = Modifier) {
+fun ScreenWithButton(modifier: Modifier = Modifier, onPlayAudio: () -> Unit) {
     // Column to center the button on the screen
     Column(
         modifier = modifier.fillMaxSize(),
@@ -54,7 +104,8 @@ fun ScreenWithButton(modifier: Modifier = Modifier) {
         Button(
             onClick = {
                 // This is where the log message is written to the console (Logcat)
-                Log.d(TAG, "Marcelina don't fucking click me again!")
+                Log.d(TAG, "Button clicked, playing audio.")
+                onPlayAudio()
             },
             // Make the button large
             modifier = Modifier
@@ -67,13 +118,5 @@ fun ScreenWithButton(modifier: Modifier = Modifier) {
                 fontSize = 28.sp // Larger text for a big button
             )
         }
-    }
-}
-
-@Preview(showBackground = true)
-@Composable
-fun ScreenWithButtonPreview() {
-    LauzHackTheme {
-        ScreenWithButton()
     }
 }
